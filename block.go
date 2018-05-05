@@ -1,9 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"strconv"
 	"time"
 )
 
@@ -14,23 +11,22 @@ type Block struct {
 	Data          []byte
 	PrevBlockHash []byte
 	Hash          []byte
-}
-
-// SetHash calculates the hash and set it
-func (b *Block) SetHash() {
-	// convert timestamp in int64 to a string and then convert the result to bytes
-	timestamp := []byte(strconv.FormatInt(b.Timestamp, 10))
-	// headers is the combination of all info conatined in the block
-	headers := bytes.Join([][]byte{b.PrevBlockHash, b.Data, timestamp}, []byte{})
-	// calculate the hash using the headers
-	hash := sha256.Sum256(headers)
-	//set the hash
-	b.Hash = hash[:]
+	Nonce         int
 }
 
 // NewBlock is used to create new block in the block chain
 func NewBlock(data string, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), []byte(data), prevBlockHash, []byte{}}
-	block.SetHash()
+	block := &Block{time.Now().Unix(), []byte(data), prevBlockHash, []byte{}, 0}
+	pow := NewProofOfWork(block)
+	nonce, hash := pow.Run()
+
+	block.Hash = hash[:]
+	block.Nonce = nonce
+
 	return block
+}
+
+// NewGenesisBlock create the genesis block(the first block) of the blockchain
+func NewGenesisBlock() *Block {
+	return NewBlock("Genesis Block", []byte{})
 }
