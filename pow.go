@@ -20,8 +20,9 @@ type ProofOfWork struct {
 // because we use big int as the target, a successful target can be considered as genrating a number smaller than 1<<(256-24)
 func NewProofOfWork(b *Block) *ProofOfWork {
 	target := big.NewInt(1)
+	// left shift
 	target.Lsh(target, uint(256-targerBits))
-
+	// create a ProofOfWork instance conataining target and the original block
 	pow := &ProofOfWork{b, target}
 	return pow
 }
