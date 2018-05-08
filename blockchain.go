@@ -54,6 +54,10 @@ func (bc *Blockchain) AddBlock(data string) {
 		return nil
 	})
 
+	if err != nil {
+		fmt.Println("Get Last Hash ErrorL", err)
+	}
+
 	// create new block
 	newBlock := NewBlock(data, lastHash)
 	// add new block to chain
