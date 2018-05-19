@@ -15,7 +15,7 @@ type Blockchain struct {
 }
 
 // BlockchainIterator is the iterator for inspecting the blockchain.
-//	This will return the next block from a blockchain
+// current Hash points to the hash to be read next time/the prevHash of current block
 type BlockchainIterator struct {
 	currentHash []byte
 	db          *bolt.DB
@@ -44,6 +44,10 @@ func (bc *Blockchain) Iterator() *BlockchainIterator {
 }
 
 // AddBlock is to add a new block to the blockchain
+//	the process to add a block into our blockchain
+//	1. get the last hash of the chain
+//	2. use the last hash to create the new block
+//	3. update the chain, move tip to the new one
 func (bc *Blockchain) AddBlock(data string) {
 	var lastHash []byte
 

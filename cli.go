@@ -14,6 +14,7 @@ type CLI struct {
 
 // Run defines the running behaviour of CLI
 func (cli *CLI) Run() {
+	cli.validateArgs()
 
 	addBlockCmd := flag.NewFlagSet("addblock", flag.ExitOnError)
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
@@ -68,5 +69,18 @@ func (cli *CLI) printChain() {
 		if len(block.PrevBlockHash) == 0 {
 			break
 		}
+	}
+}
+
+func (cli *CLI) printUsage() {
+	fmt.Println("Usage: ")
+	fmt.Println("	addblock -data <BLOCK-DATA> - add a block to the blockchain")
+	fmt.Println("	printchain - print out the blockchain")
+}
+
+func (cli *CLI) validateArgs() {
+	if len(os.Args) < 2 {
+		cli.printUsage()
+		os.Exit(1)
 	}
 }
