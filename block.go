@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"log"
 	"time"
 )
@@ -30,7 +29,7 @@ func (b *Block) Serialize() []byte {
 }
 
 // DeserializeBlock convert bytes back into a block
-func DeserializeBlock(d []byte) *Block {
+func DeserializeBlock(b []byte) *Block {
 	var block Block
 
 	decoder := gob.NewDecoder(bytes.NewReader(b))
