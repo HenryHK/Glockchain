@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
+	"math"
 	"math/big"
 )
+
+var maxNonce = math.MaxInt64
 
 const targerBits int = 24
 
@@ -32,7 +35,7 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 	data := bytes.Join(
 		[][]byte{
 			pow.block.PrevBlockHash,
-			pow.block.Data,
+			pow.block.HashTransactions(),
 			IntToHex(pow.block.Timestamp),
 			IntToHex(int64(targerBits)),
 			IntToHex(int64(nonce)),
@@ -48,8 +51,8 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	var hash [32]byte
 	nonce := 0
 
-	fmt.Printf("Mining the block containing \"%s\"\n", pow.block.Data)
-	for {
+	fmt.Printf("Mining a new block")
+	for nonce < maxNonce {
 		// Step1: prepare the data
 		data := pow.prepareData(nonce)
 		// Step2: generate sha-256 hash of data

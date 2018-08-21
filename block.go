@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"log"
 	"time"
@@ -11,7 +12,7 @@ import (
 // Timestamp marks the time, Data carries data, PrevBlockHash stores the hash of previsous block, Hash is the hash of the block itself
 type Block struct {
 	Timestamp     int64
-	Data          []byte
+	Transactions  []*Transaction
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
@@ -28,21 +29,21 @@ func (b *Block) Serialize() []byte {
 	return result.Bytes()
 }
 
-// DeserializeBlock convert bytes back into a block
-func DeserializeBlock(b []byte) *Block {
-	var block Block
+// HashTransactions hashes Transactions field within a Block and return it as a byte array
+func (b *Block) HashTransactions() []byte {
+	var txHashes [][]byte
+	var txHash [32]byte
 
-	decoder := gob.NewDecoder(bytes.NewReader(b))
-	err := decoder.Decode(&block)
-	if err != nil {
-		log.Panic("Error during deserializing:", err)
+	for _, tx := range b.Transactions {
+		txHashes = append(txHashes, tx.ID)
 	}
-	return &block
+	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
+	return txHash[:]
 }
 
 // NewBlock is used to create new block in the block chain
-func NewBlock(data string, prevBlockHash []byte) *Block {
-	block := &Block{time.Now().Unix(), []byte(data), prevBlockHash, []byte{}, 0}
+func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
+	block := &Block{time.Now().Unix(), transactions, prevBlockHash, []byte{}, 0}
 	pow := NewProofOfWork(block)
 	nonce, hash := pow.Run()
 
@@ -53,6 +54,18 @@ func NewBlock(data string, prevBlockHash []byte) *Block {
 }
 
 // NewGenesisBlock create the genesis block(the first block) of the blockchain
-func NewGenesisBlock() *Block {
-	return NewBlock("Genesis Block", []byte{})
+func NewGenesisBlock(coinbase *Transaction) *Block {
+	return NewBlock([]*Transaction{coinbase}, []byte{})
+}
+
+// DeserializeBlock convert bytes back into a block
+func DeserializeBlock(b []byte) *Block {
+	var block Block
+
+	decoder := gob.NewDecoder(bytes.NewReader(b))
+	err := decoder.Decode(&block)
+	if err != nil {
+		log.Panic("Error during deserializing:", err)
+	}
+	return &block
 }

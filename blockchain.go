@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/hex"
 	"github.com/boltdb/bolt"
 	"log"
 )
 
+const genesisCoinbaseData = "Make Australian Great Again"
 const blocksBucket = "blocks"
 const dbFile = "blockchain.db"
 
@@ -43,18 +45,22 @@ func (i *BlockchainIterator) Next() *Block {
 	return block
 }
 
-// AddBlock is to add a new block to the blockchain
-func (bc *Blockchain) AddBlock(data string) {
+// MineBlock is to add a new block to the blockchain
+func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 	var lastHash []byte
+
 	err := bc.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		lastHash = b.Get([]byte("l"))
 		return nil
 	})
+
 	if err != nil {
 		log.Panic("Error get last hash from db:", err)
 	}
-	newBlock := NewBlock(data, lastHash)
+
+	newBlock := NewBlock(transactions, lastHash)
+
 	err = bc.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		err := b.Put(newBlock.Hash, newBlock.Serialize())
@@ -70,8 +76,53 @@ func (bc *Blockchain) AddBlock(data string) {
 	})
 }
 
+// FindUnspentTransactions returns a list of transactions containing unspent outputs
+func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
+	// make a list of unspent transactions
+	var unspentTxs []Transaction
+	// make a map to store spent transactions
+	spentTXOs := make(map[string][]int)
+	bci := bc.Iterator()
+
+	for {
+		block := bci.Next()
+
+		// traverse each transaction in a block
+		for _, tx := range block.Transactions {
+			txID := hex.EncodeToString(tx.ID)
+		Outputs:
+			// traverse the outputs in a transaction
+			for outIdx, out := range tx.Vout {
+				if spentTXOs[txID] != nil { // check if this output is spent
+					for _, spentOut := range spentTXOs[txID] {
+						if spentOut == outIdx { // the output is spent
+							continue Outputs
+						}
+					}
+				}
+
+				if out.CanBeUnlockedWith(address) {
+					unspentTxs = append(unspentTxs, *tx)
+				}
+			}
+			if tx.isCoinbase() == false {
+				for _, in := range tx.Vin {
+					if in.CanUnlockOutputWith(address) {
+						inTxID := hex.EncodeToString(in.Txid)
+						spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Vout)
+					}
+				}
+			}
+		}
+		if len(block.PrevBlockHash) == 0 {
+			break
+		}
+	}
+	return unspentTxs
+}
+
 // NewBlockchain create a new blockchain with the first block is genesis block. if there exists blockchain already,do nothing.
-func NewBlockchain() *Blockchain {
+func NewBlockchain(address string) *Blockchain {
 	var tip []byte
 	db, err := bolt.Open(dbFile, 0600, nil)
 	if err != nil {
@@ -81,7 +132,8 @@ func NewBlockchain() *Blockchain {
 	err = db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		if b == nil {
-			genesis := NewGenesisBlock()
+			cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
+			genesis := NewGenesisBlock(cbtx)
 			b, err := tx.CreateBucket([]byte(blocksBucket))
 			if err != nil {
 				log.Panic("Error creating bucket:", err)

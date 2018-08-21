@@ -17,8 +17,10 @@ type CLI struct {
 func (cli *CLI) Run() {
 	// cli.validateArgs()
 	addBlockCmd := flag.NewFlagSet("addblock", flag.ExitOnError)
+	createBlockchain := flag.NewFlagSet("createblockchain", flag.ExitOnError)
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 	addBlockData := addBlockCmd.String("data", "", "Block data")
+	createBlockchainData := createBlockchain.String("address", "", "Address of transaction")
 
 	switch os.Args[1] {
 	case "addblock":
@@ -28,6 +30,11 @@ func (cli *CLI) Run() {
 		}
 	case "printchain":
 		err := printChainCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic("Error parsing print chain:", err)
+		}
+	case "createblockchain":
+		err := createBlockchain.Parse(os.Args[2:])
 		if err != nil {
 			log.Panic("Error parsing print chain:", err)
 		}
@@ -44,14 +51,26 @@ func (cli *CLI) Run() {
 		cli.addBlock(*addBlockData)
 	}
 
+	if createBlockchain.Parsed() {
+		if *createBlockchainData == "" {
+			createBlockchain.Usage()
+			os.Exit(1)
+		}
+		cli.createBlockchain(*createBlockchainData)
+	}
 	if printChainCmd.Parsed() {
 		cli.printChain()
 	}
+
 }
 
 func (cli *CLI) addBlock(data string) {
-	cli.bc.AddBlock(data)
+	cli.bc.MineBlock(data)
 	fmt.Printf("Successfully add block!")
+}
+
+func (cli *CLI) createBlockchain(data string) {
+	bc := NewBlockchain(data)
 }
 
 func (cli *CLI) printChain() {
@@ -59,7 +78,7 @@ func (cli *CLI) printChain() {
 	for {
 		block := bci.Next()
 		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
-		fmt.Printf("Data: %s\n", block.Data)
+		fmt.Printf("Data: %s\n", block.HashTransactions())
 		fmt.Printf("Hash: %x\n", block.Hash)
 		pow := NewProofOfWork(block)
 		fmt.Printf("PoW: %s\n", strconv.FormatBool(pow.Validate()))
