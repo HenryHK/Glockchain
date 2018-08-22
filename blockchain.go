@@ -80,40 +80,49 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 	// make a list of unspent transactions
 	var unspentTxs []Transaction
-	// make a map to store spent transactions
+	// make a map to store spent transactions' outputs
+	// key - hash string of transaction
+	// value - an int array storing index
 	spentTXOs := make(map[string][]int)
 	bci := bc.Iterator()
 
+	// traverse the all blocks in a blockchain
 	for {
 		block := bci.Next()
-
-		// traverse each transaction in a block
+		// have to get all used outputs from all inputs first
 		for _, tx := range block.Transactions {
-			txID := hex.EncodeToString(tx.ID)
-		Outputs:
-			// traverse the outputs in a transaction
-			for outIdx, out := range tx.Vout {
-				if spentTXOs[txID] != nil { // check if this output is spent
-					for _, spentOut := range spentTXOs[txID] {
-						if spentOut == outIdx { // the output is spent
-							continue Outputs
-						}
-					}
-				}
-
-				if out.CanBeUnlockedWith(address) {
-					unspentTxs = append(unspentTxs, *tx)
-				}
-			}
+			// if a transaction is not coinbase, traverse the inputs to add all outputs of it into spentTXOs
+			// a coinbase transaction doesn't have ins
 			if tx.isCoinbase() == false {
 				for _, in := range tx.Vin {
 					if in.CanUnlockOutputWith(address) {
+						// notice that inputs are not consuming outputs within the same transaction
 						inTxID := hex.EncodeToString(in.Txid)
 						spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Vout)
 					}
 				}
 			}
 		}
+		// traverse each transaction in a block
+		for _, tx := range block.Transactions {
+			txID := hex.EncodeToString(tx.ID)
+		Outputs:
+			// traverse the outputs in a transaction of one single block
+			for outIdx, out := range tx.Vout {
+				if spentTXOs[txID] != nil {
+					for _, spentOut := range spentTXOs[txID] {
+						if spentOut == outIdx { // the output is already stored and spent
+							continue Outputs
+						}
+					}
+				}
+				// if the output can be unlock, add it to unspent tx of this address
+				if out.CanBeUnlockedWith(address) {
+					unspentTxs = append(unspentTxs, *tx)
+				}
+			}
+		}
+		// reach the end of the blockchain
 		if len(block.PrevBlockHash) == 0 {
 			break
 		}
@@ -121,7 +130,45 @@ func (bc *Blockchain) FindUnspentTransactions(address string) []Transaction {
 	return unspentTxs
 }
 
-// NewBlockchain create a new blockchain with the first block is genesis block. if there exists blockchain already,do nothing.
+// FindUTXO return a list of unspent transaction outputs
+func (bc *Blockchain) FindUTXO(address string) []TxOutput {
+	var UTXOs []TxOutput
+	unspentTransactions := bc.FindUnspentTransactions(address)
+
+	for _, tx := range unspentTransactions {
+		for _, out := range tx.Vout {
+			if out.CanBeUnlockedWith(address) {
+				UTXOs = append(UTXOs, out)
+			}
+		}
+	}
+
+	return UTXOs
+}
+
+// FindSpendableOutputs uses FindUnspentTransactions to gather all utxos that can fullfil the amount
+func (bc *Blockchain) FindSpendableOutputs(address string, amount int) (int, map[string][]int) {
+	unspentOutputs := make(map[string][]int)
+	unspentTXs := bc.FindUnspentTransactions(address)
+	accumulated := 0
+
+Work:
+	for _, tx := range unspentTXs {
+		txID := hex.EncodeToString(tx.ID)
+		for outIdx, out := range tx.Vout {
+			if out.CanBeUnlockedWith(address) && accumulated < amount {
+				accumulated += out.Value
+				unspentOutputs[txID] = append(unspentOutputs[txID], outIdx)
+				if accumulated >= amount {
+					break Work
+				}
+			}
+		}
+	}
+	return accumulated, unspentOutputs
+}
+
+// NewBlockchain create a new blockchain with the first block is genesis block. if there exists blockchain already,do nothing and return a blochchain pointer
 func NewBlockchain(address string) *Blockchain {
 	var tip []byte
 	db, err := bolt.Open(dbFile, 0600, nil)
