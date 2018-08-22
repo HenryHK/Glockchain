@@ -18,19 +18,6 @@ type Transaction struct {
 	Vout []TxOutput
 }
 
-// TxOutput defines the structure of a transaction output
-type TxOutput struct {
-	Value        int
-	ScriptPubKey string
-}
-
-// TxInput defines the structure of a transaction input
-type TxInput struct {
-	Txid      []byte
-	Vout      int
-	ScriptSig string
-}
-
 // SetID sets ID of a transaction, it's a hash of a transaction itself
 func (tx *Transaction) SetID() {
 	// check whether this transaction already has a ID
@@ -51,16 +38,6 @@ func (tx *Transaction) SetID() {
 
 func (tx Transaction) isCoinbase() bool {
 	return len(tx.Vin) == 1 && len(tx.Vin[0].Txid) == 0 && tx.Vin[0].Vout == -1
-}
-
-// CanUnlockOutputWith checks whether the address initiated the transaction
-func (in *TxInput) CanUnlockOutputWith(unlockingData string) bool {
-	return in.ScriptSig == unlockingData
-}
-
-// CanBeUnlockedWith checks if the output can be unlocked with the provided data
-func (out *TxOutput) CanBeUnlockedWith(unlockingData string) bool {
-	return out.ScriptPubKey == unlockingData
 }
 
 // NewCoinbaseTX creates new coinbase transaction and return its pointer
